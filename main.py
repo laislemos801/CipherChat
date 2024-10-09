@@ -1,6 +1,6 @@
 from pymongo import MongoClient
 import datetime
-import mongohandler
+from database import mongohandler
 from database.entities import User, Message
 
 # Função para conectar ao banco de dados e inserir um documento
