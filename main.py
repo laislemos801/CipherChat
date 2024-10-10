@@ -2,21 +2,6 @@ import re
 import datetime
 from pymongo import MongoClient
 
-class User:
-    def __init__(self, username: str, name: str, email: str, password: str):
-        self.username = username
-        self.name = name
-        self.email = email
-        self.password = password
-
-class Message:
-    def __init__(self, username_from: str, username_to: str, text_content: str,
-                 date: datetime.datetime):
-        self.username_from = username_from
-        self.username_to = username_to
-        self.text_content = text_content
-        self.datetime = date
-
 # Função para conectar ao banco de dados e retornar a coleção de usuários
 def connect_db():
     client = MongoClient(
@@ -46,9 +31,13 @@ def validar_senha(password):
         case _:
             return True  # Se todas as condições forem atendidas, a senha é válida.
 
-# Função de login que verifica usuário e senha
-def login(email, password):
+# Função de cadastro que verifica usuário e senha
+def cadastro():
     db_users = connect_db()
+
+    #Solicita o email e senha
+    email = input("Digite seu e-mail: ")
+    password = input("Digite sua senha: ")
 
     # Verifica se o e-mail já está cadastrado
     if db_users.find_one({"email": email}):
@@ -68,17 +57,46 @@ def login(email, password):
 
     # Insere o usuário no banco de dados
     db_users.insert_one(novo_usuario)
-    print("Usuário cadastrado com sucesso!")
     return True
+
+def login ():
+   db_users = connect_db()
+
+   # Solicita o email e senha
+   email = input("Digite seu e-mail: ")
+   password = input("Digite sua senha: ")
+
+   if db_users.find_one({"email": email, "password": password}):
+       return True
+   else:
+        return False
 
 # Função principal
 def main():
-    email = input("Digite seu e-mail: ")
-    password = input("Digite sua senha: ")
-    if login(email, password):
-        print("Login realizado com sucesso!")
-    else:
-        print("Erro no login.")
+
+    print("Bem-vindo ao CipherChat!")
+    while True:
+        option = input("Você deseja (1) cadastrar | (2) fazer login? | (3) Sair do programa: ")
+        if option == "1":
+            print("Cadastre-se")
+            if cadastro():
+                print("Usuário cadastrado com sucesso!")
+            else:
+                print("Erro no cadastro.")
+        elif option == "2":
+            print("Login")
+            if login():
+                print("Login realizado com sucesso!")
+            else:
+                print("Erro no login.")
+
+        elif option == "3":
+            print("Saindo do programa...")
+            break
+        else:
+            print("Opção inválida. Tente novamente.")
+
+
 
 if __name__ == '__main__':
     main()
