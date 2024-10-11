@@ -2,4 +2,7 @@
 .venv/
 .idea/
 .env
+__pycache__/
+database/__pycache__/mongohandler.cpython-312.pyc
+
 
