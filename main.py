@@ -1,6 +1,10 @@
 import re
 import datetime
 from pymongo import MongoClient
+import os
+import base64
+from pymongo.errors import PyMongoError
+import time
 
 # Conectar ao banco de dados uma única vez
 client = MongoClient(
@@ -10,126 +14,245 @@ db = client["aulapython"]
 db_users = db.users  # Coleção de usuários
 db_messages = db.messages  # Coleção de mensagens
 
+# Função para limpar o terminal
+def clear_terminal():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+# Função para validar e-mail
+def validar_email(email):
+    return re.match(r"[^@]+@[^@]+\.[^@]+", email) is not None
+
 # Função que valida a senha
 def validar_senha(password):
     match password:
         case pw if len(pw) < 8:
-            print("A senha deve ter pelo menos 8 caracteres.")
+            carregar()  # Chama a função de carregamento após o login
+            clear_terminal()
+            print("🔴 A senha deve ter pelo menos 8 caracteres.")
             return False
         case pw if not re.search(r"[A-Z]", pw):
-            print("A senha deve conter pelo menos uma letra maiúscula.")
+            carregar()  # Chama a função de carregamento após o login
+            clear_terminal()
+            print("🔴 A senha deve conter pelo menos uma letra maiúscula.")
             return False
         case pw if not re.search(r"[a-z]", pw):
-            print("A senha deve conter pelo menos uma letra minúscula.")
+            carregar()  # Chama a função de carregamento após o login
+            clear_terminal()
+            print("🔴 A senha deve conter pelo menos uma letra minúscula.")
             return False
         case pw if not re.search(r"\d", pw):
-            print("A senha deve conter pelo menos um número.")
+            carregar()  # Chama a função de carregamento após o login
+            clear_terminal()
+            print("🔴 A senha deve conter pelo menos um número.")
             return False
         case pw if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", pw):
-            print("A senha deve conter pelo menos um caractere especial (!@#$%^&*(),.?\":{}|<>).")
+            carregar()  # Chama a função de carregamento após o login
+            clear_terminal()
+            print("🔴 A senha deve conter pelo menos um caractere especial (!@#$%^&*(),.?\":{}|<>).")
             return False
         case _:
             return True  # Se todas as condições forem atendidas, a senha é válida.
 
 # Função de cadastro que verifica usuário e senha
 def cadastro():
-    # Solicita o email
-    email = input("Digite seu e-mail: ")
+    email = input("✉️ Digite seu e-mail: ")
 
-    # Verifica se o e-mail já está cadastrado
-    if db_users.find_one({"email": email}):
-        print("E-mail já cadastrado. Tente novamente.")
+    if not validar_email(email):
+        carregar()  # Chama a função de carregamento após o login
+        clear_terminal()
+        print("🔴 E-mail inválido. Tente novamente.")
         return False
 
-    # Loop para solicitar a senha até que ela seja válida
-    while True:
-        password = input("Digite sua senha: ")
-        if validar_senha(password):
-            break  # Sai do loop se a senha for válida
-        else:
-            print("Tente novamente.")
+    if db_users.find_one({"email": email}):
+        carregar()  # Chama a função de carregamento após o login
+        clear_terminal()
+        print("🔴 E-mail já cadastrado. Tente novamente.")
+        return False
 
-    # Cria um documento para o novo usuário
+    while True:
+        password = input("🔒 Digite sua senha: ")
+        if validar_senha(password):
+            break
+        else:
+            print("🔴 Tente novamente.")
+
     novo_usuario = {
         "email": email,
         "password": password,
         "created_at": datetime.datetime.now(tz=datetime.timezone.utc)
     }
 
-    # Insere o usuário no banco de dados
-    db_users.insert_one(novo_usuario)
-    return True
+    try:
+        db_users.insert_one(novo_usuario)
+        return True
+    except PyMongoError as e:
+        print(f"🔴 Erro ao inserir usuário no banco de dados: {e}")
+        return False
 
 # Função de login
 def login():
-    # Solicita o email e senha
-    email = input("Digite seu e-mail: ")
-    password = input("Digite sua senha: ")
+    email = input("✉️ Digite seu e-mail: ")
+    password = input("🔒 Digite sua senha: ")
 
-    if db_users.find_one({"email": email, "password": password}):
-        return email  # Retorna o e-mail do usuário logado
-    else:
+    try:
+        if db_users.find_one({"email": email, "password": password}):
+            return email
+        else:
+            carregar()  # Chama a função de carregamento após o login
+            clear_terminal()
+            print("🔴 E-mail ou senha incorretos.")
+            return None
+    except PyMongoError as e:
+        carregar()  # Chama a função de carregamento após o login
+        clear_terminal()
+        print(f"🔴 Erro ao acessar o banco de dados: {e}")
         return None
 
-# Função para enviar uma mensagem
-def enviar_mensagem(usuario):
-    # Recupera todos os usuários cadastrados no banco de dados
-    usuarios_cadastrados = list(db_users.find({}, {"email": 1, "_id": 0}))  # Retorna apenas os e-mails
+def xor_crypt(message, key):
+    if not key:
+        print("🔴 Erro: A chave de criptografia não está definida.")
+        return None
+    encrypted_bytes = bytes(
+        ord(c) ^ ord(key[i % len(key)]) for i, c in enumerate(message)
+    )
+    encrypted_message = base64.b64encode(encrypted_bytes).decode('utf-8')
+    return encrypted_message
 
-    if not usuarios_cadastrados:
-        print("Nenhum usuário cadastrado encontrado.")
+def xor_decrypt(encrypted_message, key):
+    if not key:
+        print("🔴 Erro: A chave de criptografia não está definida.")
+        return None
+    try:
+        encrypted_bytes = base64.b64decode(encrypted_message.encode('utf-8'))
+    except base64.binascii.Error:
+        print("🔴 Erro: Mensagem criptografada em formato inválido.")
+        return None
+    decrypted_message = ''.join(
+        chr(b ^ ord(key[i % len(key)])) for i, b in enumerate(encrypted_bytes)
+    )
+    return decrypted_message
+
+def enviar_mensagem(usuario):
+    key = os.getenv('KEY_CRYPTO')
+
+    if not key:
+        print("🔴 Erro: A chave de criptografia não está definida. Configure a variável de ambiente 'KEY_CRYPTO'.")
         return
 
-    # Exibe os usuários cadastrados com numeração
-    print("Usuários cadastrados:")
+    try:
+        usuarios_cadastrados = list(db_users.find({}, {"email": 1, "_id": 0}))
+    except PyMongoError as e:
+        print(f"🔴 Erro ao acessar o banco de dados: {e}")
+        return
+
+    if not usuarios_cadastrados:
+        print("🔴 Nenhum usuário cadastrado encontrado.")
+        return
+
+    clear_terminal()
+    print("="*39)
+    print("📬 Escolha o destinatário da mensagem:")
+    print("="*39)
     for idx, user in enumerate(usuarios_cadastrados, start=1):
         print(f"{idx}) {user['email']}")
 
-    # Solicita que o remetente escolha o destinatário pela numeração
     while True:
         try:
-            escolha = int(input("Escolha o número do destinatário: "))
+            escolha = int(input("\n🔍 Escolha o número do destinatário: "))
             if 1 <= escolha <= len(usuarios_cadastrados):
                 destinatario = usuarios_cadastrados[escolha - 1]['email']
                 break
             else:
-                print("Opção inválida, escolha um número válido.")
+                print("🔴 Opção inválida, escolha um número válido.")
         except ValueError:
-            print("Entrada inválida, digite um número.")
+            print("🔴 Entrada inválida, digite um número.")
 
-    # Solicita a mensagem
-    mensagem = input("Digite sua mensagem: ")
+    mensagem = input("💬 Digite sua mensagem: ")
+    encrypted_message = xor_crypt(mensagem, key)
+    if encrypted_message is None:
+        print("🔴 Falha na criptografia da mensagem.")
+        return
 
-    # Cria um documento de mensagem
     nova_mensagem = {
         "remetente": usuario,
         "destinatario": destinatario,
-        "mensagem": mensagem,
+        "mensagem": encrypted_message,
         "data": datetime.datetime.now(tz=datetime.timezone.utc)
     }
 
-    # Insere a mensagem no banco de dados
-    db_messages.insert_one(nova_mensagem)
-    print(f"Mensagem enviada com sucesso para {destinatario}!")
+    try:
+        db_messages.insert_one(nova_mensagem)
+        clear_terminal()
+        carregar()
+        print(f"✅ Mensagem enviada com sucesso para {destinatario}!")
+    except PyMongoError as e:
+        print(f"🔴 Erro ao enviar mensagem: {e}")
 
-
-# Função para ler mensagens
 def ler_mensagens(usuario):
-    mensagens = db_messages.find({"destinatario": usuario})
+    key = os.getenv('KEY_CRYPTO')
 
-    if mensagens.count() == 0:
-        print("Nenhuma mensagem encontrada.")
+    if not key:
+        print("🔴 Erro: A chave de criptografia não está definida. Configure a variável de ambiente 'KEY_CRYPTO'.")
+        return
+
+    try:
+        count = db_messages.count_documents({"destinatario": usuario})
+    except PyMongoError as e:
+        print(f"🔴 Erro ao acessar o banco de dados: {e}")
+        return
+
+    if count == 0:
+        print("🔴 Nenhuma mensagem encontrada.")
     else:
-        for msg in mensagens:
-            print(f"De: {msg['remetente']}, Mensagem: {msg['mensagem']}")
+        try:
+            mensagens = db_messages.find({"destinatario": usuario})
+            clear_terminal()
+            print("\n📥 Mensagens recebidas:")
+            for msg in mensagens:
+                decrypted_message = xor_decrypt(msg['mensagem'], key)
+                data_formatada = msg['data'].strftime('%d/%m/%Y %H:%M:%S')
+                
+                # Formatação personalizada como e-mail
+                print("="*50)
+                if decrypted_message is None:
+                    print(f"🔴 De: {msg['remetente']}\nEnviado: {data_formatada}\n\nMensagem: [Erro na descriptografia]")
+                else:
+                    print(f"🔹 De: {msg['remetente']}\nEnviado: {data_formatada}\n\nMensagem:\n{decrypted_message}")
+                print("="*50)
+
+        except PyMongoError as e:
+            print(f"🔴 Erro ao recuperar mensagens: {e}")
+
+    # Pergunta ao usuário se deseja sair
+    while True:
+        print("\nVocê deseja fechar as mensagens? (1) Sim")
+        escolha = input("Escolha uma opção: ")
+        if escolha == "1":
+            clear_terminal()
+            print("👋 Fechando mensagens...")
+            return  # Sai da função
+        else:
+            print("🔴 Opção inválida. Tente novamente.")
+
+# Função de carregamento
+def carregar():
+    print("🔄 Carregando", end="")
+    for _ in range(3):  # Exibe por 3 segundos
+        print(".", end="", flush=True)
+        time.sleep(1)
+    print("\n")
+    clear_terminal()
 
 # Função que exibe o menu após login bem-sucedido
 def menu_usuario(usuario):
     while True:
-        print("\nEscolha uma opcao:")
-        print("(1) Enviar mensagem")
-        print("(2) Ler mensagens")
-        print("(3) Sair")
+        print("\n" + "="*30)
+        print(" "*8 + "MENU DE USUÁRIO")
+        print("="*30)
+        print(" "*4 + "(1) Enviar mensagem")
+        print(" "*4 + "(2) Ler mensagens")
+        print(" "*4 + "(3) Sair")
+        print("="*30)
         option = input("Escolha uma opção: ")
 
         if option == "1":
@@ -137,40 +260,95 @@ def menu_usuario(usuario):
         elif option == "2":
             ler_mensagens(usuario)
         elif option == "3":
-            print("Saindo...")
+            clear_terminal()
+            print("👋 Saindo...")
             break
         else:
-            print("Opção inválida. Tente novamente.")
+            print("🔴 Opção inválida. Tente novamente.")
 
 # Função principal
 def main():
-    print("Bem-vindo ao CipherChat!")
+    clear_terminal()
+    print("="*30)
+    print(" "*3 + "BEM-VINDO AO CIPHERCHAT!")
+    print("="*30)
     while True:
-        print("\nVocê deseja:")
-        print("(1) Fazer cadastro")
-        print("(2) Fazer login")
-        print("(3) Sair do programa")
+        print("\n" + "="*30)
+        print(" "*8 + "MENU PRINCIPAL")
+        print("="*30)
+        print(" "*4 + "(1) Fazer cadastro")
+        print(" "*4 + "(2) Fazer login")
+        print(" "*4 + "(3) Sair do programa")
+        print("="*30)
         option = input("Escolha uma opção: ")
 
         if option == "1":
-            print("Cadastre-se")
+            clear_terminal()
+            print("\n" + "="*30)
+            print(" "*8 +"📝 CADASTRE-SE")
+            print("="*30)
             if cadastro():
-                print("Usuário cadastrado com sucesso!")
+                carregar()  # Chama a função de carregamento após o cadastro
+                print("✅ Usuário cadastrado com sucesso!")
+               
             else:
-                print("Erro no cadastro.")
+                print("🔴 Erro no cadastro.")
         elif option == "2":
-            print("Login")
+            clear_terminal()
+            print("\n" + "="*30)
+            print(" "*10 +"🔑 LOGIN")
+            print("="*30)
             usuario = login()
             if usuario:
-                print("Login realizado com sucesso!")
-                menu_usuario(usuario)  # Mostra o menu após login
+                carregar()  # Chama a função de carregamento após o login
+                print("✅ Login realizado com sucesso!")
+                menu_usuario(usuario)
             else:
-                print("Erro no login.")
+                print("🔴 Erro no login.")
         elif option == "3":
-            print("Saindo do programa...")
+            print("👋 Saindo do programa...")
             break
         else:
-            print("Opção inválida. Tente novamente.")
+            print("🔴 Opção inválida. Tente novamente.")
+    clear_terminal()
+    print("="*30)
+    print(" "*3 + "BEM-VINDO AO CIPHERCHAT!")
+    print("="*30)
+    while True:
+        print("\n" + "="*30)
+        print(" "*8 + "MENU PRINCIPAL")
+        print("="*30)
+        print(" "*4 + "(1) Fazer cadastro")
+        print(" "*4 + "(2) Fazer login")
+        print(" "*4 + "(3) Sair do programa")
+        print("="*30)
+        option = input("Escolha uma opção: ")
+
+        if option == "1":
+            clear_terminal()
+            print("\n" + "="*30)
+            print(" "*8 +"📝 CADASTRE-SE")
+            print("="*30)
+            if cadastro():
+                print("✅ Usuário cadastrado com sucesso!")
+            else:
+                print("🔴 Erro no cadastro.")
+        elif option == "2":
+            clear_terminal()
+            print("\n" + "="*30)
+            print(" "*10 +"🔑 LOGIN")
+            print("="*30)
+            usuario = login()
+            if usuario:
+                print("✅ Login realizado com sucesso!")
+                menu_usuario(usuario)
+            else:
+                print("🔴 Erro no login.")
+        elif option == "3":
+            print("👋 Saindo do programa...")
+            break
+        else:
+            print("🔴 Opção inválida. Tente novamente.")
 
 if __name__ == '__main__':
     main()
