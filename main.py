@@ -1,5 +1,7 @@
 import re
 import datetime
+
+from dotenv import load_dotenv
 from pymongo import MongoClient
 import os
 import base64
@@ -133,6 +135,7 @@ def xor_decrypt(encrypted_message, key):
     return decrypted_message
 
 def enviar_mensagem(usuario):
+    load_dotenv()
     key = os.getenv('KEY_CRYPTO')
 
     if not key:
@@ -189,6 +192,7 @@ def enviar_mensagem(usuario):
         print(f"🔴 Erro ao enviar mensagem: {e}")
 
 def ler_mensagens(usuario):
+    load_dotenv()
     key = os.getenv('KEY_CRYPTO')
 
     if not key:
@@ -225,8 +229,8 @@ def ler_mensagens(usuario):
 
     # Pergunta ao usuário se deseja sair
     while True:
-        print("\nVocê deseja fechar as mensagens? (1) Sim")
-        escolha = input("Escolha uma opção: ")
+        print("\nVocê deseja fechar as mensagens?")
+        escolha = input("Digite 1 para fechar: ")
         if escolha == "1":
             clear_terminal()
             print("👋 Fechando mensagens...")
@@ -290,7 +294,6 @@ def main():
             if cadastro():
                 carregar()  # Chama a função de carregamento após o cadastro
                 print("✅ Usuário cadastrado com sucesso!")
-               
             else:
                 print("🔴 Erro no cadastro.")
         elif option == "2":
@@ -306,47 +309,9 @@ def main():
             else:
                 print("🔴 Erro no login.")
         elif option == "3":
-            print("👋 Saindo do programa...")
-            break
-        else:
-            print("🔴 Opção inválida. Tente novamente.")
-    clear_terminal()
-    print("="*30)
-    print(" "*3 + "BEM-VINDO AO CIPHERCHAT!")
-    print("="*30)
-    while True:
-        print("\n" + "="*30)
-        print(" "*8 + "MENU PRINCIPAL")
-        print("="*30)
-        print(" "*4 + "(1) Fazer cadastro")
-        print(" "*4 + "(2) Fazer login")
-        print(" "*4 + "(3) Sair do programa")
-        print("="*30)
-        option = input("Escolha uma opção: ")
-
-        if option == "1":
             clear_terminal()
-            print("\n" + "="*30)
-            print(" "*8 +"📝 CADASTRE-SE")
-            print("="*30)
-            if cadastro():
-                print("✅ Usuário cadastrado com sucesso!")
-            else:
-                print("🔴 Erro no cadastro.")
-        elif option == "2":
-            clear_terminal()
-            print("\n" + "="*30)
-            print(" "*10 +"🔑 LOGIN")
-            print("="*30)
-            usuario = login()
-            if usuario:
-                print("✅ Login realizado com sucesso!")
-                menu_usuario(usuario)
-            else:
-                print("🔴 Erro no login.")
-        elif option == "3":
             print("👋 Saindo do programa...")
-            break
+            break  # Sai do loop principal e encerra o programa
         else:
             print("🔴 Opção inválida. Tente novamente.")
 
