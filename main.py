@@ -10,7 +10,7 @@ import time
 
 # Conectar ao banco de dados uma única vez
 client = MongoClient(
-    'mongodb+srv://ana:ana39@consultas.2opj3.mongodb.net/?retryWrites=true&w=majority&appName=Consultas'
+    'mongodb+srv://laispl2:qwerty123456@consultas.hihh4wp.mongodb.net/?retryWrites=true&w=majority&appName=Consultas'
 )
 db = client["aulapython"]
 db_users = db.users  # Coleção de usuários
@@ -23,6 +23,11 @@ def clear_terminal():
 # Função para validar e-mail
 def validar_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email) is not None
+
+# Função para validar o nome de usuário
+def validar_username(username):
+    # Verifica se o username contém apenas letras, números, sublinhos e hífens
+    return re.match(r"^[a-zA-Z0-9_-]+$", username) is not None
 
 # Função que valida a senha
 def validar_senha(password):
@@ -55,6 +60,7 @@ def validar_senha(password):
         case _:
             return True  # Se todas as condições forem atendidas, a senha é válida.
 
+
 # Função de cadastro que verifica usuário e senha
 def cadastro():
     email = input("✉️ Digite seu e-mail: ")
@@ -72,6 +78,19 @@ def cadastro():
         return False
 
     while True:
+        username = input("👤 Escolha um nome de usuário (sem espaços): ")
+
+        if validar_username(username):
+            if db_users.find_one({"username": username}):
+                carregar()  # Chama a função de carregamento após o login
+                clear_terminal()
+                print("🔴 Nome de usuário já cadastrado. Tente novamente.")
+            else:
+                break
+        else:
+            print("🔴 Nome de usuário inválido. Use apenas letras, números, sublinhos ou hífens e sem espaços.")
+
+    while True:
         password = input("🔒 Digite sua senha: ")
         if validar_senha(password):
             break
@@ -80,6 +99,7 @@ def cadastro():
 
     novo_usuario = {
         "email": email,
+        "username": username,  # Adiciona o campo username
         "password": password,
         "created_at": datetime.datetime.now(tz=datetime.timezone.utc)
     }
