@@ -3,18 +3,21 @@ import datetime
 
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from database.mongohandler import MongoHandler
 import os
-import base64
 from pymongo.errors import PyMongoError
 import time
 
-# Conectar ao banco de dados uma única vez
+# Conectar ao banco de dados
 client = MongoClient(
     'mongodb+srv://laispl2:qwerty123456@consultas.hihh4wp.mongodb.net/?retryWrites=true&w=majority&appName=Consultas'
 )
-db = client["aulapython"]
-db_users = db.users  # Coleção de usuários
-db_messages = db.messages  # Coleção de mensagens
+db = client["CipherChat"]
+db_users = db.users
+db_messages = db.messages
+
+#importando a classe MongoHandler
+obj = MongoHandler()
 
 # Função para limpar o terminal
 def clear_terminal():
@@ -33,46 +36,45 @@ def validar_username(username):
 def validar_senha(password):
     match password:
         case pw if len(pw) < 8:
-            carregar()  # Chama a função de carregamento após o login
+            carregar()  # Chama a função de carregamento
             clear_terminal()
             print("🔴 A senha deve ter pelo menos 8 caracteres.")
             return False
         case pw if not re.search(r"[A-Z]", pw):
-            carregar()  # Chama a função de carregamento após o login
+            carregar()
             clear_terminal()
             print("🔴 A senha deve conter pelo menos uma letra maiúscula.")
             return False
         case pw if not re.search(r"[a-z]", pw):
-            carregar()  # Chama a função de carregamento após o login
+            carregar()
             clear_terminal()
             print("🔴 A senha deve conter pelo menos uma letra minúscula.")
             return False
         case pw if not re.search(r"\d", pw):
-            carregar()  # Chama a função de carregamento após o login
+            carregar()
             clear_terminal()
             print("🔴 A senha deve conter pelo menos um número.")
             return False
         case pw if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", pw):
-            carregar()  # Chama a função de carregamento após o login
+            carregar()
             clear_terminal()
             print("🔴 A senha deve conter pelo menos um caractere especial (!@#$%^&*(),.?\":{}|<>).")
             return False
         case _:
-            return True  # Se todas as condições forem atendidas, a senha é válida.
-
+            return True
 
 # Função de cadastro que verifica usuário e senha
 def cadastro():
     email = input("✉️ Digite seu e-mail: ")
 
     if not validar_email(email):
-        carregar()  # Chama a função de carregamento após o login
+        carregar()
         clear_terminal()
         print("🔴 E-mail inválido. Tente novamente.")
         return False
 
     if db_users.find_one({"email": email}):
-        carregar()  # Chama a função de carregamento após o login
+        carregar()
         clear_terminal()
         print("🔴 E-mail já cadastrado. Tente novamente.")
         return False
@@ -82,7 +84,7 @@ def cadastro():
 
         if validar_username(username):
             if db_users.find_one({"username": username}):
-                carregar()  # Chama a função de carregamento após o login
+                carregar()
                 clear_terminal()
                 print("🔴 Nome de usuário já cadastrado. Tente novamente.")
             else:
@@ -117,42 +119,21 @@ def login():
     password = input("🔒 Digite sua senha: ")
 
     try:
-        if db_users.find_one({"email": email, "password": password}):
-            return email
+        # Busca o usuário pelo email e senha
+        user = db_users.find_one({"email": email, "password": password})
+        if user:
+            # Retorna o username do documento encontrado
+            return user['username']
         else:
-            carregar()  # Chama a função de carregamento após o login
+            carregar()
             clear_terminal()
             print("🔴 E-mail ou senha incorretos.")
             return None
     except PyMongoError as e:
-        carregar()  # Chama a função de carregamento após o login
+        carregar()
         clear_terminal()
         print(f"🔴 Erro ao acessar o banco de dados: {e}")
         return None
-
-def xor_crypt(message, key):
-    if not key:
-        print("🔴 Erro: A chave de criptografia não está definida.")
-        return None
-    encrypted_bytes = bytes(
-        ord(c) ^ ord(key[i % len(key)]) for i, c in enumerate(message)
-    )
-    encrypted_message = base64.b64encode(encrypted_bytes).decode('utf-8')
-    return encrypted_message
-
-def xor_decrypt(encrypted_message, key):
-    if not key:
-        print("🔴 Erro: A chave de criptografia não está definida.")
-        return None
-    try:
-        encrypted_bytes = base64.b64decode(encrypted_message.encode('utf-8'))
-    except base64.binascii.Error:
-        print("🔴 Erro: Mensagem criptografada em formato inválido.")
-        return None
-    decrypted_message = ''.join(
-        chr(b ^ ord(key[i % len(key)])) for i, b in enumerate(encrypted_bytes)
-    )
-    return decrypted_message
 
 def enviar_mensagem(usuario):
     load_dotenv()
@@ -163,7 +144,7 @@ def enviar_mensagem(usuario):
         return
 
     try:
-        usuarios_cadastrados = list(db_users.find({}, {"email": 1, "_id": 0}))
+        usuarios_cadastrados = list(db_users.find({}, {"username": 2, "_id": 0}))
     except PyMongoError as e:
         print(f"🔴 Erro ao acessar o banco de dados: {e}")
         return
@@ -177,13 +158,13 @@ def enviar_mensagem(usuario):
     print("📬 Escolha o destinatário da mensagem:")
     print("="*39)
     for idx, user in enumerate(usuarios_cadastrados, start=1):
-        print(f"{idx}) {user['email']}")
+        print(f"{idx}) {user['username']}")
 
     while True:
         try:
             escolha = int(input("\n🔍 Escolha o número do destinatário: "))
             if 1 <= escolha <= len(usuarios_cadastrados):
-                destinatario = usuarios_cadastrados[escolha - 1]['email']
+                destinatario = usuarios_cadastrados[escolha - 1]['username']
                 break
             else:
                 print("🔴 Opção inválida, escolha um número válido.")
@@ -191,7 +172,7 @@ def enviar_mensagem(usuario):
             print("🔴 Entrada inválida, digite um número.")
 
     mensagem = input("💬 Digite sua mensagem: ")
-    encrypted_message = xor_crypt(mensagem, key)
+    encrypted_message = obj.xor_crypt(mensagem, key)
     if encrypted_message is None:
         print("🔴 Falha na criptografia da mensagem.")
         return
@@ -233,7 +214,7 @@ def ler_mensagens(usuario):
             clear_terminal()
             print("\n📥 Mensagens recebidas:")
             for msg in mensagens:
-                decrypted_message = xor_decrypt(msg['mensagem'], key)
+                decrypted_message = obj.xor_decrypt(msg['mensagem'], key)
                 data_formatada = msg['data'].strftime('%d/%m/%Y %H:%M:%S')
                 
                 # Formatação personalizada como e-mail
@@ -261,9 +242,9 @@ def ler_mensagens(usuario):
 # Função de carregamento
 def carregar():
     print("🔄 Carregando", end="")
-    for _ in range(3):  # Exibe por 3 segundos
+    for _ in range(3):
         print(".", end="", flush=True)
-        time.sleep(1)
+        time.sleep(0.3)
     print("\n")
     clear_terminal()
 
@@ -312,7 +293,7 @@ def main():
             print(" "*8 +"📝 CADASTRE-SE")
             print("="*30)
             if cadastro():
-                carregar()  # Chama a função de carregamento após o cadastro
+                carregar()
                 print("✅ Usuário cadastrado com sucesso!")
             else:
                 print("🔴 Erro no cadastro.")
@@ -323,7 +304,7 @@ def main():
             print("="*30)
             usuario = login()
             if usuario:
-                carregar()  # Chama a função de carregamento após o login
+                carregar()
                 print("✅ Login realizado com sucesso!")
                 menu_usuario(usuario)
             else:
