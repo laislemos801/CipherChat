@@ -1,47 +1,37 @@
 import base64
 import datetime
-from dotenv import load_dotenv
 import os
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from utils import clear_terminal, carregar
+from aes_pkcs5.algorithms.aes_cbc_pkcs5_padding import AESCBCPKCS5Padding
 
 # Conectar ao banco de dados
 client = MongoClient(
-    'mongodb+srv://laispl2:qwerty123456@consultas.hihh4wp.mongodb.net/?retryWrites=true&w=majority&appName=Consultas'
+    'mongodb+srv://ana:ana39@consultas.2opj3.mongodb.net/?retryWrites=true&w=majority&appName=Consultas'
 )
 db = client["CipherChat"]
 db_users = db.users
 db_messages = db.messages
 
 class MongoHandler:
-    def xor_crypt(self, message, key):
-        if not key:
-            print("🔴 Erro: A chave de criptografia não está definida.")
-            return None
-        encrypted_bytes = bytes(
-            ord(c) ^ ord(key[i % len(key)]) for i, c in enumerate(message)
-        )
-        encrypted_message = base64.b64encode(encrypted_bytes).decode('utf-8')
+    def xor_crypt(self, message, key, iv_parameter="0011223344556677", output_format="b64"):
+
+        keyB= key.ljust(16, '0')[:16]  # muda o tamamho
+
+        cipher=AESCBCPKCS5Padding(keyB, output_format, iv_parameter)
+        encrypted_message=cipher.encrypt(message)
         return encrypted_message
 
-    def xor_decrypt(self, encrypted_message, key):
-        if not key:
-            print("🔴 Erro: A chave de criptografia não está definida.")
-            return None
-        try:
-            encrypted_bytes = base64.b64decode(encrypted_message.encode('utf-8'))
-        except base64.binascii.Error:
-            print("🔴 Erro: Mensagem criptografada em formato inválido.")
-            return None
-        decrypted_message = ''.join(
-            chr(b ^ ord(key[i % len(key)])) for i, b in enumerate(encrypted_bytes)
-        )
-        return decrypted_message
+    def xor_decrypt(self, encrypted_message, key, iv_parameter="0011223344556677", output_format="b64"):
+        keyB = key.ljust(16, '0')[:16]  # muda o tamamho
+        cipher = AESCBCPKCS5Padding(keyB, output_format, iv_parameter)
+        decrypt_message = cipher.decrypt(encrypted_message)
+        return decrypt_message
 
-    def enviar_mensagem(self, usuario):  # Adicione 'self' aqui
-        load_dotenv()
-        key = os.getenv('KEY_CRYPTO')
+    def enviar_mensagem(self, usuario, key):  # Adicione 'self' aqui
+
+        key = key.ljust(16, '0')[:16] #muda o tamamho
 
         if not key:
             print("🔴 Erro: A chave de criptografia não está definida. Configure a variável de ambiente 'KEY_CRYPTO'.")
@@ -76,7 +66,7 @@ class MongoHandler:
                 print("🔴 Entrada inválida, digite um número.")
 
         mensagem = input("💬 Digite sua mensagem: ")
-        encrypted_message = self.xor_crypt(mensagem, key)  # Usando 'self'
+        encrypted_message = self.xor_crypt(mensagem, key)
         if encrypted_message is None:
             print("🔴 Falha na criptografia da mensagem.")
             return
@@ -97,7 +87,7 @@ class MongoHandler:
             print(f"🔴 Erro ao enviar mensagem: {e}")
 
     def ler_mensagens(self, usuario):  # Adicione 'self' aqui
-        load_dotenv()
+        #mudarload_dotenv()
         key = os.getenv('KEY_CRYPTO')
 
         if not key:
