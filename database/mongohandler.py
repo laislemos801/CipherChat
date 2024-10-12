@@ -1,6 +1,4 @@
-import base64
 import datetime
-import os
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from utils import clear_terminal, carregar
@@ -8,7 +6,7 @@ from aes_pkcs5.algorithms.aes_cbc_pkcs5_padding import AESCBCPKCS5Padding
 
 # Conectar ao banco de dados
 client = MongoClient(
-    'mongodb+srv://ana:ana39@consultas.2opj3.mongodb.net/?retryWrites=true&w=majority&appName=Consultas'
+    'mongodb+srv://laispl2:qwerty123456@consultas.hihh4wp.mongodb.net/?retryWrites=true&w=majority&appName=Consultas'
 )
 db = client["CipherChat"]
 db_users = db.users
@@ -29,13 +27,7 @@ class MongoHandler:
         decrypt_message = cipher.decrypt(encrypted_message)
         return decrypt_message
 
-    def enviar_mensagem(self, usuario, key):  # Adicione 'self' aqui
-
-        key = key.ljust(16, '0')[:16] #muda o tamamho
-
-        if not key:
-            print("🔴 Erro: A chave de criptografia não está definida. Configure a variável de ambiente 'KEY_CRYPTO'.")
-            return
+    def enviar_mensagem(self, usuario):
 
         try:
             usuarios_cadastrados = list(db_users.find({}, {"username": 2, "_id": 0}))
@@ -66,6 +58,14 @@ class MongoHandler:
                 print("🔴 Entrada inválida, digite um número.")
 
         mensagem = input("💬 Digite sua mensagem: ")
+        if not mensagem.strip():
+            print("🔴 A mensagem não pode estar vazia.")
+            return
+
+        # Solicita a chave após escolher o destinatário
+        key = input("🔑 Digite a chave de criptografia: ")
+        key = key.ljust(16, '0')[:16]  # Ajusta o tamanho da chave
+
         encrypted_message = self.xor_crypt(mensagem, key)
         if encrypted_message is None:
             print("🔴 Falha na criptografia da mensagem.")
@@ -86,50 +86,48 @@ class MongoHandler:
         except PyMongoError as e:
             print(f"🔴 Erro ao enviar mensagem: {e}")
 
-    def ler_mensagens(self, usuario):  # Adicione 'self' aqui
-        #mudarload_dotenv()
-        key = os.getenv('KEY_CRYPTO')
-
-        if not key:
-            print("🔴 Erro: A chave de criptografia não está definida. Configure a variável de ambiente 'KEY_CRYPTO'.")
-            return
-
+    def ler_mensagens(self, usuario):
         try:
-            count = db_messages.count_documents({"destinatario": usuario})
+            mensagens_enviadas = list(db_messages.find({"destinatario": usuario}))
         except PyMongoError as e:
             print(f"🔴 Erro ao acessar o banco de dados: {e}")
             return
 
-        if count == 0:
+        if not mensagens_enviadas:
             print("🔴 Nenhuma mensagem encontrada.")
-        else:
-            try:
-                mensagens = db_messages.find({"destinatario": usuario})
-                clear_terminal()
-                print("\n📥 Mensagens recebidas:")
-                for msg in mensagens:
-                    decrypted_message = self.xor_decrypt(msg['mensagem'], key)  # Usando 'self'
-                    data_formatada = msg['data'].strftime('%d/%m/%Y %H:%M:%S')
+            return
 
-                    # Formatação personalizada como e-mail
-                    print("=" * 50)
-                    if decrypted_message is None:
-                        print(
-                            f"🔴 De: {msg['remetente']}\nEnviado: {data_formatada}\n\nMensagem: [Erro na descriptografia]")
-                    else:
-                        print(f"🔹 De: {msg['remetente']}\nEnviado: {data_formatada}\n\nMensagem:\n{decrypted_message}")
-                    print("=" * 50)
+        clear_terminal()
+        print("=" * 39)
+        print("📬 Mensagens recebidas:")
+        print("=" * 39)
 
-            except PyMongoError as e:
-                print(f"🔴 Erro ao recuperar mensagens: {e}")
+        # Exibe as mensagens e os remetentes
+        for idx, mensagem in enumerate(mensagens_enviadas, start=1):
+            print(f"{idx}) De: {mensagem['remetente']} | Data: {mensagem['data']}")
 
-        # Pergunta ao usuário se deseja sair
         while True:
-            print("\nVocê deseja fechar as mensagens?")
-            escolha = input("Digite 1 para fechar: ")
-            if escolha == "1":
-                clear_terminal()
-                print("👋 Fechando mensagens...")
-                return  # Sai da função
+            try:
+                escolha = int(input("\n🔍 Escolha o número da mensagem para ler: "))
+                if 1 <= escolha <= len(mensagens_enviadas):
+                    mensagem_selecionada = mensagens_enviadas[escolha - 1]
+                    break
+                else:
+                    print("🔴 Opção inválida, escolha um número válido.")
+            except ValueError:
+                print("🔴 Entrada inválida, digite um número.")
+
+        # Solicita a chave para descriptografar a mensagem
+        key = input("🔑 Digite a chave de criptografia: ")
+
+        # Descriptografa a mensagem
+        try:
+            decrypted_message = self.xor_decrypt(mensagem_selecionada['mensagem'], key)
+
+            # Verifica se a mensagem descriptografada é válida
+            if not decrypted_message:
+                print("🔴 Chave de criptografia inválida. Não foi possível descriptografar a mensagem.")
             else:
-                print("🔴 Opção inválida. Tente novamente.")
+                print(f"\n💬 Mensagem: {decrypted_message}")  # Exibe a mensagem descriptografada
+        except Exception as e:
+            print(f"🔴 Erro ao descriptografar a mensagem: {e}")

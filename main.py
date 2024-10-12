@@ -5,10 +5,9 @@ from pymongo.errors import PyMongoError
 from database.mongohandler import MongoHandler
 from utils import clear_terminal, carregar
 
-
 # Conectar ao banco de dados
 client = MongoClient(
-    'mongodb+srv://ana:ana39@consultas.2opj3.mongodb.net/?retryWrites=true&w=majority&appName=Consultas'
+    'mongodb+srv://laispl2:qwerty123456@consultas.hihh4wp.mongodb.net/?retryWrites=true&w=majority&appName=Consultas'
 )
 db = client["CipherChat"]
 db_users = db.users
